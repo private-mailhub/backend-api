@@ -1,199 +1,303 @@
 <p align="center">
-  <img src="front-end/public/logo.png" alt="Mailhub Logo" width="150" />
+  <img src="front-end/public/logo.png" alt="Mailhub logo" width="120" />
 </p>
-
 
 <h1 align="center">Mailhub</h1>
 
 <p align="center">
-  <a href="https://private-mailhub.com">https://private-mailhub.com</a><br><br>
-  <b>Protect your email with masking<br/>Manage all your emails in one place</b>
+  A privacy-first email relay that keeps your real address out of third-party services.
 </p>
+
 <p align="center">
-  <a href="#about">About</a> · <a href="https://github.com/private-mailhub/mailhub/releases">Relase Notes</a> · <a href="#about">About</a> · <a href="#how-it-works">How It Works</a> · <a href="#architecture">Architecture</a> · <a href="#getting-started">Getting Started</a> · <a href="#security">Security</a>
+  <a href="https://private-mailhub.com">Try Mailhub</a> ·
+  <a href="https://github.com/youngjinmo/mailhub/releases">Releases</a> ·
+  <a href="https://github.com/youngjinmo/mailhub/issues">Issues</a>
 </p>
+
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/youngjinmo/mailhub" alt="Relase" />
-  <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg" alt="Node.js" />
-  <img src="https://img.shields.io/badge/TypeScript-5.x-blue.svg" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/NestJS-11.x-red.svg" alt="NestJS" />
-  <img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License: AGPL-3.0" />
+  <img src="https://img.shields.io/github/v/release/youngjinmo/mailhub" alt="Latest release" />
+  <img src="https://img.shields.io/badge/Node.js-%3E%3D20-brightgreen.svg" alt="Node.js >= 20" />
+  <img src="https://img.shields.io/badge/NestJS-11.x-ea2845.svg" alt="NestJS 11" />
+  <img src="https://img.shields.io/badge/React-18-61dafb.svg" alt="React 18" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="AGPL-3.0 license" /></a>
 </p>
 
----
+Mailhub creates private relay addresses such as `shop.7x9k@private-mailhub.com`. Use a different
+address for each service, receive the messages in your real inbox, and disable an address whenever
+it starts receiving unwanted mail.
 
-# About
+## Contents
 
-Every time you sign up for a newsletter, create an account, or fill out a form, you hand over your email address — and with it, a direct line to your inbox. That address leaked in breaches, and buried under spam. 
+- [Features](#features)
+- [Screenshots](#screenshots)
+- [How it works](#how-it-works)
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
+- [Self-hosting](#self-hosting)
+- [Useful commands](#useful-commands)
+- [Production deployment](#production-deployment)
+- [Security](#security)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
-Mailhub is an open-source email relay service that stands between your real inbox and the outside world. Instead of giving out your personal email, you generate a unique relay address like `reg1234h@private-mailhub.com`. Emails sent to that address are automatically forwarded to your real inbox. If a relay address starts receiving spam, simply disable it — your real address stays private, untouched, and in your control.
+## Features
 
-Think of it as a **disposable shield for your inbox**🛡️: use a different relay address for every service, and cut off any address the moment it becomes a problem. No more unsubscribe links that don't work. No more spam you never signed up for.
+- **Relay addresses** — Create random or custom addresses for shopping, newsletters, sign-ups, and
+  other services.
+- **One-click control** — Add a label, copy an address, and turn forwarding on or off at any time.
+- **Reply masking** — Reply to forwarded messages without exposing your primary address.
+- **Flexible sign-in** — Use email verification or connect GitHub and Google OAuth.
+- **Free tier** — Create up to 20 relay addresses on the current free tier.
+- **Application-layer encryption** — Primary addresses and reply-routing values are stored as
+  AES-256-GCM ciphertext. See [Security](#security) for the current key-management limitation.
 
-## Core Values
+## Screenshots
 
-- **🔒 Privacy** — Your real email address is never exposed to third-party services. All sensitive data is encrypted at rest using AES-256-GCM. We don't read, analyze, or monetize your emails.
-- **🔍 Transparency** — Mailhub is fully open source under the [AGPL-3.0 License](LICENSE). Every line of code that handles your email can be audited, reviewed, and verified by anyone.
+<p align="center">
+  <img src="front-end/public/landing-main.png" alt="Mailhub relay address dashboard" width="800" />
+</p>
 
-> **Privacy and transparency are not features — they are the foundation this project is built on.**
+## How it works
 
-<br>
+1. **Sign in** and choose an email verification code or an OAuth provider.
+2. **Create a relay address** for the service you are using.
+3. **Use the relay address** instead of your real email address.
+4. **Receive messages normally** in your inbox. If the address becomes noisy, disable it without
+   changing your primary email.
 
-# How It Works
+## Architecture
 
-Mailhub acts as an intermediary between external senders and your real inbox. Here's what happens behind the scenes:
-
-1. **You create a relay address** — Sign up and generate a unique address like `shop2024x@private-mailhub.com`. Use it anywhere you'd normally give out your email.
-
-2. **Someone sends you an email** — When an email arrives at your relay address, Mailhub receives it through AWS SES and stores the encrypted content securely.
-
-3. **We forward it to you** — The email is decrypted, processed, and forwarded to your real inbox via Mailgun. The sender never learns your actual email address.
-
-   <img src="front-end/public/forwarded.png" width="400px">
-
-4. **You stay in control** — Disable or delete any relay address at any time. Spam from that source stops instantly.
-
-<br>
-
-# Architecture
-
-Mailhub is built on a robust, event-driven architecture powered by AWS managed services and a NestJS backend.
+Mailhub separates the web application from the email worker. AWS services receive and queue inbound
+mail, while the worker resolves the relay address and sends the message to the destination inbox.
 
 ```mermaid
-flowchart TD
-    Sender["📧 External Sender"] -->|"relay@private-mailhub.com"| SES
-    
-    subgraph AWS["AWS Cloud"]
-        SES["SES"]
-        S3["S3"]
-        SQS["SQS"]
-        RDS["RDS<br/>(MySQL)"]
-        
-        subgraph EC2["EC2 Instance"]
-            Worker["Email Worker"]
-            Redis["Redis<br/>(Cache)"]
-        end
-        
-        SES -->|"Encrypt & Store"| S3
-        SES -->|"Enqueue"| SQS
+flowchart LR
+    Sender[External sender] -->|relay address| SES[Amazon SES]
+
+    subgraph AWS[AWS]
+        SES -->|store raw message| S3[Amazon S3]
+        SES -->|enqueue event| SQS[Amazon SQS]
     end
-    
-    SQS -->|"Poll"| Worker
-    S3 -->|"Decrypt"| Worker
-    
-    Worker -->|"1. Check Cache"| Redis
-    Redis -.->|"Cache Miss"| RDS
-    RDS -.->|"Store in Cache"| Redis
-    Redis -->|"relay@private-mailhub.com → real@email.com"| Worker
-    
-    Worker -->|"Forward"| Mailgun["Mailgun"]
-    Mailgun --> Inbox["📬 User's Inbox"]
+
+    SQS --> Worker[Mailhub worker]
+    S3 -->|load raw message| Worker
+    Worker --> Redis[Redis]
+    Worker --> DB[(MySQL)]
+    Worker --> Mailer[Mailer]
+    Mailer --> Inbox[Destination inbox]
 ```
 
-## Email Processing Pipeline
+### Email processing pipeline
 
-| Step | Component | Description |
-|------|-----------|-------------|
-| 1 | **AWS SES** | Receives inbound email on `@private-mailhub.com` domain |
-| 2 | **Amazon S3** | Stores the raw email content with server-side encryption |
-| 3 | **Amazon SQS** | Queues the S3 object key for asynchronous processing |
-| 4 | **SQS Poller** | NestJS worker polls SQS every 30 seconds via long polling |
-| 5 | **Email Parser** | Retrieves encrypted email from S3, decrypts, and extracts metadata |
-| 6 | **Mailgun API**  | Forwards the processed email to the user's real inbox        |
+| Step | Component | Responsibility |
+| --- | --- | --- |
+| 1 | Amazon SES | Receives mail for the configured relay domain. |
+| 2 | Amazon S3 | Stores the raw MIME message. Configure S3 encryption and retention outside this repository. |
+| 3 | Amazon SQS | Queues the S3 event for asynchronous processing. |
+| 4 | Mailhub worker | Polls SQS, loads the message, and resolves the relay address. |
+| 5 | Redis and MySQL | Cache and persist relay/account lookups. |
+| 6 | Mailgun or SES | Forwards the processed message to the destination inbox. |
 
-<br>
+## Tech stack
 
-# Tech Stack
+| Area | Technology |
+| --- | --- |
+| Frontend | React, TypeScript, Vite, Tailwind CSS |
+| Backend | Node.js, TypeScript, NestJS |
+| Database | MySQL-compatible database through TypeORM |
+| Cache | Redis |
+| Inbound email | Amazon SES, S3, SQS |
+| Outbound email | Mailgun in production, Amazon SES in other environments |
+| Deployment | Nginx and PM2 |
+| License | AGPL-3.0 |
 
-| Category | Technology |
-|----------|-----------|
-| **Runtime** | Node.js, TypeScript |
-| **Framework** | NestJS |
-| **Database** | MySQL (Amazon RDS) |
-| **Cache & Rate Limiting** | Redis |
-| **Email Inbound** | Amazon SES |
-| **Email Outbound** | Mailgun |
-| **Storage** | Amazon S3 |
-| **Message Queue** | Amazon SQS |
-| **DNS** | Amazon Route 53 |
-| **Process Manager** | PM2 |
-| **Encryption** | AES-256-GCM |
+## Self-hosting
 
-<br>
+The repository contains two independent Node.js applications. There is no root `package.json`, so
+install and run dependencies from `back-end` and `front-end` separately.
 
-# Getting Started
+This repository does not provision AWS or DNS resources. Before running a worker, configure a SES
+receipt rule that stores mail in S3, an S3 event notification to SQS, IAM permissions for the worker,
+and DNS/verified sending identities for the relay domain. Configure S3 encryption, retention, and
+access policies in AWS; the application only reads the resulting SQS event and S3 object.
 
 ### Prerequisites
 
-- Node.js >= 18.0.0
-- MySQL 8.x
-- Redis 7.x
-- AWS Account (SES, S3, SQS, RDS, Route 53)
-- Mailgun Account
-- A custom domain with DNS access
+- Node.js 20 or newer and npm
+- MySQL 8+ or another MySQL-compatible database
+- Redis 7+
+- AWS account with SES, S3, and SQS configured for the relay domain
+- Mailgun account for production outbound mail
+- DNS access for the relay domain
 
-### Installation
+OAuth providers are optional. Add GitHub and/or Google credentials only when you enable the matching
+sign-in option. The backend has an Apple OAuth endpoint, but the current web UI does not expose an
+Apple sign-in control.
+
+### 1. Clone and install
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/private-mailhub.git
-cd private-mailhub
+git clone https://github.com/youngjinmo/mailhub.git
+cd mailhub
 
-# Install dependencies
-cd /back-end/ ** npm clean install
-
-# Build application
-npm run build
-
-# Run database migrations
-npm run migration:run
-
-# Start the application
-npm run start
+npm --prefix back-end ci
+npm --prefix front-end ci
 ```
 
-### Environment Configuration
+### 2. Configure the environment
 
-Refer to `.env.example` for the full list of required environment variables, including:
+Copy the checked-in examples and replace every placeholder before starting the backend:
 
-- AWS credentials and region configuration
-- Database connection settings
-- Redis connection settings
-- Mailgun API key and domain
-- Encryption keys
-- Rate limiting thresholds
+```bash
+cp back-end/.env.example back-end/.env
+cp front-end/.env.example front-end/.env
+```
 
-<br>
+Generate a 32-byte Base64 value for `ENCRYPTION_KEY`:
 
-# Security
+```bash
+openssl rand -base64 32
+```
 
-Mailhub takes security seriously. Here's how we protect your data:
+The current browser client requires the same value in `back-end/.env` as `ENCRYPTION_KEY` and in
+`front-end/.env` as `VITE_ENCRYPTION_KEY`. Vite exposes `VITE_*` values in the browser bundle, so
+this value is an implementation compatibility value, not a server-only secret. Never put a JWT,
+AWS, Mailgun, OAuth, or other server secret in a `VITE_*` variable. Keep server-only values in a
+secrets manager and never commit `.env` files.
 
-- **Encryption at Rest** — All stored email content is encrypted using AES-256-GCM before being written to S3.
-- **Email Authentication** — SPF, DKIM, and DMARC records are configured to prevent spoofing and ensure email integrity.
-- **Rate Limiting** — Multi-layer rate limiting (per relay address, per IP, per sender) prevents abuse and protects service availability.
-- **Spam Detection** — Inbound emails pass through a spam filtering pipeline before forwarding.
+The most important settings are:
 
-## Reporting Vulnerabilities
+| File | Variable | Example or note |
+| --- | --- | --- |
+| `back-end/.env` | `APP_NAME`, `APP_DOMAIN`, `PORT`, `CORS_ORIGINS` | Application identity, relay domain, listener, and allowed browser origins. |
+| `back-end/.env` | `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | Database connection. |
+| `back-end/.env` | `REDIS_HOST`, `REDIS_PORT`, `REDIS_TTL` | Redis connection and cache lifetime. |
+| `back-end/.env` | `JWT_SECRET`, `ENCRYPTION_KEY` | Server configuration; `ENCRYPTION_KEY` must decode to 32 bytes. |
+| `back-end/.env` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_EMAIL_BUCKET`, `AWS_SQS_QUEUE_NAME`, `AWS_SQS_QUEUE_URL` | AWS SDK configuration used by the mail path and worker. |
+| `back-end/.env` | `NO_REPLY_ADDRESS`, `CONTACT_ADDRESS` | Service and support addresses. |
+| `back-end/.env` | `MAILGUN_API_KEY`, `MAILGUN_BASE_URL` | Valid Mailgun settings are required to send production mail. |
+| `back-end/.env` | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional; required only for the corresponding web OAuth flow. |
+| `back-end/.env` | `APPLE_CLIENT_ID` | Used by the backend Apple OAuth endpoint; the current web UI does not expose that flow. |
+| `front-end/.env` | `VITE_API_URL` | Local default: `http://localhost:8080`. Do not append `/api`. |
+| `front-end/.env` | `VITE_ENCRYPTION_KEY` | Must match the backend value, but is visible to browser users. |
 
-Security audits and responsible disclosure are welcome. If you discover a vulnerability, please **do not open a public issue**. Instead, email us at [contact@private-mail.com](mailto:contact@private-mail.com) so we can address it promptly.
+The backend validates its core startup configuration. See the two `.env.example` files for the
+complete list; optional OAuth settings are read only when their corresponding flow is used.
 
-<br>
+### 3. Initialize the database
 
-# Roadmap
+There is no verified fresh-database bootstrap at this revision. Do not use
+`scripts/init-db.sql` for a new production installation: it does not match the current entities.
+The checked-in migration chain also assumes an older schema, including historical foreign-key and
+index names, so it is not a safe replacement for the bootstrap script.
 
-- [ ] Reply-Relay function: fully mask email address when reply
-- [ ] Email worker switching to Lambda for cost efficiency
-- [ ] AI-powered email summarization
-- [ ] Browser extension/Mobiles apps
+Use a schema baseline that you have validated against this revision before starting a new deployment.
+For an existing installation, back up the database and validate the target schema in a disposable
+environment before running `npm --prefix back-end run migration:run`.
 
-<br>
+### 4. Start the applications
 
-# License
+Start the backend and frontend in separate terminals:
 
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+```bash
+# Terminal 1: API server
+npm --prefix back-end run start:dev
+```
 
-This means you are free to view, modify, and distribute the source code, but any modified version that is made available as a network service must also be open-sourced under the same license. This ensures that Mailhub — and any derivative works — remain transparent and open for the community to audit.
+```bash
+# Terminal 2: Vite development server
+npm --prefix front-end run start
+```
 
-See the [LICENSE](LICENSE) file for the full license text.
+Open [http://localhost:3000](http://localhost:3000). The API is available at
+[http://localhost:8080/api](http://localhost:8080/api).
 
+To run the SQS worker locally, start a second backend process with worker mode enabled. It requires
+the AWS S3/SQS resources to be configured:
+
+```bash
+WORKER_MODE=true npm --prefix back-end run start:dev
+```
+
+## Useful commands
+
+### Backend
+
+| Command | Purpose |
+| --- | --- |
+| `npm --prefix back-end run start:dev` | Start the API in watch mode. |
+| `npm --prefix back-end run build` | Build the backend and run its formatting/lint steps. |
+| `npm --prefix back-end run test` | Run unit tests. |
+| `npm --prefix back-end run test:e2e` | Run end-to-end tests. |
+| `npm --prefix back-end run migration:run` | Apply pending TypeORM migrations. |
+| `npm --prefix back-end run migration:revert` | Revert the latest migration. |
+
+### Frontend
+
+| Command | Purpose |
+| --- | --- |
+| `npm --prefix front-end run start` | Start the Vite development server. |
+| `npm --prefix front-end run build:prod` | Create a production frontend build. |
+| `npm --prefix front-end run lint` | Check frontend lint rules. |
+| `npm --prefix front-end run preview` | Preview the production build locally. |
+
+## Production deployment
+
+The repository includes starting-point templates for [PM2](ecosystem.config.js) and
+[Nginx](nginx.config.mjs). They are not turnkey deployment automation. In particular, correct the
+uncommented `HTTPS server` text in the Nginx template before copying it, then run `nginx -t` on the
+target host. Before using either template:
+
+1. Update their absolute paths and domain names for your server.
+2. Provision MySQL, Redis, AWS SES/S3/SQS, Mailgun, DNS, and TLS.
+3. Build both applications:
+
+   ```bash
+   npm --prefix back-end run build
+   npm --prefix front-end run build:prod
+   ```
+
+4. Run one PM2 process with `WORKER_MODE=false` for the API and one with `WORKER_MODE=true` for the
+   SQS worker.
+5. Configure Nginx to serve `front-end/dist` and proxy `/api` to port `8080`, then validate the
+   rendered Nginx configuration before reloading it.
+
+Set `NODE_ENV=production` to use Mailgun for outbound email. In development and other non-production
+environments, the mail service uses Amazon SES instead.
+
+## Security
+
+- Primary email addresses and reply-routing values are encrypted with AES-256-GCM before database or
+  cache storage.
+- `VITE_ENCRYPTION_KEY` is intentionally available to the browser bundle in the current design. It
+  can reduce accidental plaintext exposure in application storage, but it is not protection against
+  a browser-bundle or key compromise. Do not describe it as a server-only encryption secret.
+- Use a separate, randomly generated `JWT_SECRET` per environment. Treat AWS, Mailgun, and OAuth
+  credentials as server-only secrets.
+- Grant AWS and Mailgun credentials only the permissions required by the deployment.
+- Do not commit `.env` files, private keys, API keys, or production data.
+
+To report a vulnerability, please do not open a public issue. Email
+[contact@private-mail.com](mailto:contact@private-mail.com) instead.
+
+## Roadmap
+
+- [ ] Improve reply-relay handling and sender privacy
+- [ ] Move the email worker to AWS Lambda for cost efficiency
+- [ ] Add AI-powered email summarization
+- [ ] Add browser extension and mobile apps
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a pull request:
+
+1. Keep changes focused and explain the user-visible impact.
+2. Run the relevant backend tests and frontend lint/build commands.
+3. Never include secrets or real email addresses in commits, tests, or screenshots.
+
+For security vulnerabilities, use the private reporting channel above instead of a public issue.
+
+## License
+
+Mailhub is licensed under the [GNU Affero General Public License v3.0](LICENSE).
